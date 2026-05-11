@@ -14,15 +14,11 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 from rich.console import Console
 
-from config import MIN_FILE_AGE_SECONDS, CATEGORY_FOLDERS
+from config import MIN_FILE_AGE_SECONDS
 from agent.classifier import FileClassifier
 from agent.executor import FileExecutor
 
 console = Console()
-
-# Folder names we create — ignore events inside them to avoid infinite loops
-MANAGED_FOLDER_NAMES = set(CATEGORY_FOLDERS.values())
-
 
 class OrganizerEventHandler(FileSystemEventHandler):
     """
@@ -42,10 +38,6 @@ class OrganizerEventHandler(FileSystemEventHandler):
             return
 
         filepath = Path(event.src_path)
-
-        # Skip files inside managed sub-folders (we created those)
-        if filepath.parent.name in MANAGED_FOLDER_NAMES:
-            return
 
         # Skip hidden files and temp files (e.g. .DS_Store, .part, ~$...)
         if self._is_temp_file(filepath):
@@ -69,7 +61,8 @@ class OrganizerEventHandler(FileSystemEventHandler):
         result = self.classifier.classify(filepath)
         llm_tag = "[cyan](LLM)[/cyan]" if result.used_llm else "[dim](rule)[/dim]"
         console.print(
-            f"  {llm_tag} → [green]{result.category}[/green] "
+            f"  {llm_tag} → [green]{result.semester}[/green] / "
+            f"[cyan]{result.lecture}[/cyan] "
             f"({result.confidence:.0%}) — {result.reason}"
         )
 

@@ -1,29 +1,26 @@
 """
-agent/classifier.py — two-stage file classifier.
+agent/classifier.py — content-aware classifier using a local Ollama LLM.
 
-Stage 1: Fast rule-based lookup by extension  (free, instant).
-Stage 2: LLM call for ambiguous files          (paid, ~200ms).
-
-The classifier returns a ClassifyResult dataclass so the rest of the
-agent never has to parse raw API responses.
+Pipeline:
+  1. Extract a text snippet from the file (PDF, DOCX, TXT, …)
+  2. Scan the Studium folder tree to get available semesters + lectures
+  3. Ask Ollama to pick the best (semester, lecture) match
+  4. Return a ClassifyResult with the target path
 """
 
 from __future__ import annotations
 import json
-import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-# from openai import OpenAI
-from ollama import chat
+import ollama
+import fitz          # pymupdf
+import docx          # python-docx
 from rich.console import Console
 
 from config import (
-    EXTENSION_MAP,
-    AMBIGUOUS_EXTENSIONS,
-    CLASSIFIER_SYSTEM_PROMPT,
-    CLASSIFIER_USER_TEMPLATE,
-    CONFIDENCE_THRESHOLD,
+    STUDIUM_DIR, OLLAMA_MODEL, OLLAMA_URL,
+    MAX_CONTENT_CHARS, READABLE_EXTENSIONS, CONFIDENCE_THRESHOLD,
 )
 
 console = Console()
@@ -34,11 +31,15 @@ console = Console()
 # ---------------------------------------------------------------------------
 @dataclass
 class ClassifyResult:
-    category: str
+    semester:   str        # e.g. "1. Semester"
+    lecture:    str        # e.g. "Mathematik 1"
     confidence: float
-    reason: str
-    used_llm: bool = False
-    error: str = ""
+    reason:     str
+    error:      str = ""
+
+    @property
+    def target_dir(self) -> Path:
+        return STUDIUM_DIR / self.semester / self.lecture
 
     @property
     def is_confident(self) -> bool:
@@ -46,118 +47,170 @@ class ClassifyResult:
 
 
 # ---------------------------------------------------------------------------
-# Classifier class
+# Folder scanner
+# ---------------------------------------------------------------------------
+def scan_studium_tree() -> dict[str, list[str]]:
+    """
+    Returns {semester_name: [lecture_name, …]} by reading the real folder tree.
+    Example: {"1. Semester": ["Mathematik 1", "Informatik"], …}
+    """
+    tree: dict[str, list[str]] = {}
+    if not STUDIUM_DIR.exists():
+        raise FileNotFoundError(
+            f"Studium folder not found: {STUDIUM_DIR}\n"
+            "Create it first or update STUDIUM_DIR in config.py"
+        )
+    for sem_dir in sorted(STUDIUM_DIR.iterdir()):
+        if sem_dir.is_dir() and not sem_dir.name.startswith("."):
+            lectures = [
+                d.name for d in sorted(sem_dir.iterdir())
+                if d.is_dir() and not d.name.startswith(".")
+            ]
+            tree[sem_dir.name] = lectures
+    return tree
+
+
+# ---------------------------------------------------------------------------
+# Content extractor
+# ---------------------------------------------------------------------------
+def extract_text(filepath: Path) -> str:
+    """Extract a short text snippet from the file for LLM context."""
+    ext = filepath.suffix.lower()
+    text = ""
+
+    try:
+        if ext == ".pdf":
+            doc = fitz.open(str(filepath))
+            for page in doc:
+                text += page.get_text()
+                if len(text) >= MAX_CONTENT_CHARS:
+                    break
+            doc.close()
+
+        elif ext in {".docx", ".doc"}:
+            document = docx.Document(str(filepath))
+            text = "\n".join(p.text for p in document.paragraphs)
+
+        elif ext in READABLE_EXTENSIONS:
+            text = filepath.read_text(encoding="utf-8", errors="ignore")
+
+    except Exception as e:
+        console.print(f"  [yellow]Content extract warning:[/yellow] {e}")
+
+    return text[:MAX_CONTENT_CHARS].strip()
+
+
+# ---------------------------------------------------------------------------
+# Classifier
 # ---------------------------------------------------------------------------
 class FileClassifier:
-    """
-    Wraps rule-based + LLM classification behind a single .classify() method.
-    Keeps a simple in-memory token counter so you can estimate API cost.
-    """
-
-    def __init__(self, model: str="llama3"):
-        """
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise EnvironmentError(
-                "OPENAI_API_KEY not set. Create a .env file with your key."
+    def __init__(self):
+        # Validate Ollama is reachable at startup
+        try:
+            client = ollama.Client(host=OLLAMA_URL)
+            client.list()   # raises if Ollama isn't running
+            self.client = client
+            self.model = OLLAMA_MODEL
+        except Exception:
+            raise RuntimeError(
+                "Cannot reach Ollama at " + OLLAMA_URL + "\n"
+                "Start it with: ollama serve"
             )
-        self.client    = OpenAI(api_key=api_key)
-        """
-        self.model = model
-        self.llm_calls = 0
-        self.total_tokens = 0
+        self.tree = scan_studium_tree()
+        console.print(f"  Loaded {sum(len(v) for v in self.tree.values())} lectures "
+                      f"across {len(self.tree)} semesters from Studium folder.")
 
-    # ------------------------------------------------------------------
-    # Public interface
     # ------------------------------------------------------------------
     def classify(self, filepath: Path) -> ClassifyResult:
-        """Classify a single file. Always returns a ClassifyResult."""
-        ext = filepath.suffix.lower()
-
-        # --- Stage 1: rule-based ---
-        if ext in EXTENSION_MAP and ext not in AMBIGUOUS_EXTENSIONS:
-            return ClassifyResult(
-                category=EXTENSION_MAP[ext],
-                confidence=1.0,
-                reason="Matched by file extension rule.",
-                used_llm=False,
-            )
-
-        # --- Stage 2: LLM ---
-        return self._llm_classify(filepath.name)
+        content = extract_text(filepath)
+        return self._llm_classify(filepath.name, content)
 
     # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-    def _llm_classify(self, filename: str) -> ClassifyResult:
-        """Send filename to the LLM and parse the JSON response."""
-        self.llm_calls += 1
+    def _llm_classify(self, filename: str, content: str) -> ClassifyResult:
+        tree_str = json.dumps(self.tree, ensure_ascii=False, indent=2)
+        content_snippet = content if content else "(no readable content — use filename only)"
+
+        prompt = f"""You are a university file organiser.
+Given a filename and a content snippet, choose the best semester folder
+and lecture subfolder from the available structure below.
+
+Available folder structure (JSON):
+{tree_str}
+
+Filename: {filename}
+Content snippet:
+---
+{content_snippet}
+---
+
+Respond ONLY with a JSON object — no markdown, no explanation outside it:
+{{
+  "semester": "<exact semester folder name from the structure>",
+  "lecture":  "<exact lecture folder name from that semester>",
+  "confidence": <float 0.0-1.0>,
+  "reason": "<one sentence, max 15 words>"
+}}
+
+Rules:
+- Use EXACT folder names as they appear in the structure.
+- If nothing matches well, pick the closest one and set confidence below 0.5.
+- Never invent folder names that are not in the structure.
+"""
+
         try:
-            """
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": CLASSIFIER_USER_TEMPLATE.format(filename=filename),
-                    },
-                ],
-                temperature=0,          # deterministic classification
-                max_tokens=120,
-                response_format={"type": "json_object"},
+            response = self.client.chat(
+                model=OLLAMA_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                format="json",
+                options={"temperature": 0},
             )
-            """
-            response = chat(
-                model="llama3",
-                messages=[
-                    {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": CLASSIFIER_USER_TEMPLATE.format(filename=filename),
-                    },
-                ],
-                response_format={"type": "json_object"},
-            )
-            self.total_tokens += response.usage.total_tokens
-            raw = response.choices[0].message.content
+            raw = response["message"]["content"]
             data = json.loads(raw)
 
+            semester = data.get("semester", "")
+            lecture  = data.get("lecture",  "")
+
+            # Validate against real folder tree
+            if semester not in self.tree:
+                return self._fallback(f"Unknown semester '{semester}' returned by LLM")
+            if lecture not in self.tree[semester]:
+                return self._fallback(
+                    f"Lecture '{lecture}' not in {semester}", semester=semester
+                )
+
             result = ClassifyResult(
-                category=data.get("category", "misc"),
+                semester=semester,
+                lecture=lecture,
                 confidence=float(data.get("confidence", 0.5)),
                 reason=data.get("reason", "LLM classification."),
-                used_llm=True,
             )
 
-            # Safety: fall back to misc if confidence too low
             if not result.is_confident:
                 console.print(
-                    f"  [yellow]⚠ Low confidence ({result.confidence:.0%}) "
-                    f"for '{filename}' → misc[/yellow]"
+                    f"  [yellow]⚠ Low confidence ({result.confidence:.0%}) — "
+                    f"double-check placement[/yellow]"
                 )
-                result.category = "misc"
 
             return result
 
         except json.JSONDecodeError as e:
-            return ClassifyResult(
-                category="misc", confidence=0.0,
-                reason="JSON parse error from LLM.",
-                used_llm=True, error=str(e),
-            )
+            return self._fallback(f"JSON parse error: {e}")
         except Exception as e:
-            return ClassifyResult(
-                category="misc", confidence=0.0,
-                reason="LLM call failed.",
-                used_llm=True, error=str(e),
-            )
+            return self._fallback(f"LLM call failed: {e}")
 
-    def cost_estimate(self) -> str:
-        """Rough cost estimate (GPT-4o-mini pricing as of mid-2024)."""
-        cost_usd = self.total_tokens * 0.00000015  # ~$0.15 per 1M tokens
-        return (
-            f"LLM calls: {self.llm_calls} | "
-            f"Tokens: {self.total_tokens:,} | "
-            f"Est. cost: ${cost_usd:.4f}"
+    def _fallback(self, reason: str, semester: str = "") -> ClassifyResult:
+        """When classification fails, pick the first semester as a safe landing zone."""
+        first_sem = semester or (list(self.tree.keys())[0] if self.tree else "")
+        console.print(f"  [red]Fallback:[/red] {reason}")
+        return ClassifyResult(
+            semester=first_sem,
+            lecture="_Unsorted",
+            confidence=0.0,
+            reason=reason,
+            error=reason,
         )
+
+    def reload_tree(self) -> None:
+        """Call this if you add new semester/lecture folders at runtime."""
+        self.tree = scan_studium_tree()
+        console.print("  [dim]Folder tree reloaded.[/dim]")

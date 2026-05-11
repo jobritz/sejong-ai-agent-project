@@ -30,6 +30,7 @@ from agent.executor import FileExecutor
 from agent.watcher import OrganizerEventHandler
 from config import SUMMARY_HOUR
 from utils.reporter import print_summary
+from config import WATCH_DIR, STUDIUM_DIR
 
 load_dotenv()
 console = Console()
@@ -42,7 +43,7 @@ LOG_FILENAME = "organizer.log"
 # ---------------------------------------------------------------------------
 def build_agent(watch_dir: Path):
     """Instantiate and wire up all agent components."""
-    log_path = watch_dir / LOG_FILENAME
+    log_path = STUDIUM_DIR / LOG_FILENAME
     classifier = FileClassifier()
     executor = FileExecutor(watch_dir, log_path)
     handler = OrganizerEventHandler(classifier, executor)
@@ -77,7 +78,6 @@ def start_watching(watch_dir: Path) -> None:
         console.print("\n[yellow]Shutting down...[/yellow]")
         observer.stop()
         print_summary(log_path, since_hours=24)
-        console.print(classifier.cost_estimate())
         sys.exit(0)
 
     signal.signal(signal.SIGINT, _shutdown)
@@ -105,7 +105,7 @@ def main() -> None:
     parser.add_argument(
         "--watch", "-w",
         type=Path,
-        default=Path(os.getenv("WATCH_DIR", "~/Downloads")),
+        default=Path(os.getenv("WATCH_DIR", str(WATCH_DIR))), 
         help="Folder to watch (default: ~/Downloads or $WATCH_DIR)",
     )
     parser.add_argument(

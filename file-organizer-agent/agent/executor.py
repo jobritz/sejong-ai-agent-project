@@ -19,7 +19,7 @@ from pathlib import Path
 
 from rich.console import Console
 
-from config import CATEGORY_FOLDERS, MAX_UNDO_STACK
+from config import MAX_UNDO_STACK
 from agent.classifier import ClassifyResult
 
 console = Console()
@@ -57,16 +57,17 @@ class FileExecutor:
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
+    # Replace the execute() method only — everything else stays the same
+
+
     def execute(self, filepath: Path, result: ClassifyResult) -> MoveRecord | None:
-        """
-        Move *filepath* to the appropriate category sub-folder.
-        Returns the MoveRecord, or None if the file no longer exists.
-        """
         if not filepath.exists():
             console.print(f"  [dim]File gone before move: {filepath.name}[/dim]")
             return None
 
-        dest_folder = self._category_folder(result.category)
+        # ← NEW: destination comes from the ClassifyResult directly
+        dest_folder = result.target_dir
+        dest_folder.mkdir(parents=True, exist_ok=True)  # create if needed
         dest_path = self._resolve_collision(dest_folder / filepath.name)
 
         record = MoveRecord(
@@ -74,19 +75,18 @@ class FileExecutor:
             filename=filepath.name,
             source=str(filepath),
             destination=str(dest_path),
-            category=result.category,
+            # ← store semester + lecture instead of flat category
+            category=f"{result.semester} / {result.lecture}",
             confidence=result.confidence,
             reason=result.reason,
-            used_llm=result.used_llm,
+            used_llm=True,
         )
 
-        # Log intent first, then move (crash-safe ordering)
         self._write_log(record)
         shutil.move(str(filepath), str(dest_path))
         self.undo_stack.append(record)
-
         return record
-
+    
     def undo_last(self) -> MoveRecord | None:
         """Move the last file back to its original location."""
         if not self.undo_stack:
@@ -122,12 +122,6 @@ class FileExecutor:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-    def _category_folder(self, category: str) -> Path:
-        folder_name = CATEGORY_FOLDERS.get(category, CATEGORY_FOLDERS["misc"])
-        folder = self.watch_dir / folder_name
-        folder.mkdir(exist_ok=True)
-        return folder
-
     @staticmethod
     def _resolve_collision(path: Path) -> Path:
         """If path already exists, append _1, _2, … before the extension."""
