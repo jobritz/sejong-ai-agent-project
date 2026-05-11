@@ -34,11 +34,11 @@ console = Console()
 # ---------------------------------------------------------------------------
 @dataclass
 class ClassifyResult:
-    category:   str
+    category: str
     confidence: float
-    reason:     str
-    used_llm:   bool = False
-    error:      str  = ""
+    reason: str
+    used_llm: bool = False
+    error: str = ""
 
     @property
     def is_confident(self) -> bool:
@@ -54,7 +54,7 @@ class FileClassifier:
     Keeps a simple in-memory token counter so you can estimate API cost.
     """
 
-    def __init__(self, model: str = "llama3"):
+    def __init__(self, model: str="llama3"):
         """
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -63,7 +63,7 @@ class FileClassifier:
             )
         self.client    = OpenAI(api_key=api_key)
         """
-        self.model     = model
+        self.model = model
         self.llm_calls = 0
         self.total_tokens = 0
 

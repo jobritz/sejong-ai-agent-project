@@ -30,14 +30,14 @@ console = Console()
 # ---------------------------------------------------------------------------
 @dataclass
 class MoveRecord:
-    timestamp:  float
-    filename:   str
-    source:     str         # absolute path before move
-    destination:str         # absolute path after move
-    category:   str
+    timestamp: float
+    filename: str
+    source: str  # absolute path before move
+    destination:str  # absolute path after move
+    category: str
     confidence: float
-    reason:     str
-    used_llm:   bool
+    reason: str
+    used_llm: bool
 
 
 # ---------------------------------------------------------------------------
@@ -49,8 +49,8 @@ class FileExecutor:
     """
 
     def __init__(self, watch_dir: Path, log_path: Path):
-        self.watch_dir  = watch_dir
-        self.log_path   = log_path
+        self.watch_dir = watch_dir
+        self.log_path = log_path
         self.undo_stack: deque[MoveRecord] = deque(maxlen=MAX_UNDO_STACK)
         self._ensure_log_file()
 
@@ -67,7 +67,7 @@ class FileExecutor:
             return None
 
         dest_folder = self._category_folder(result.category)
-        dest_path   = self._resolve_collision(dest_folder / filepath.name)
+        dest_path = self._resolve_collision(dest_folder / filepath.name)
 
         record = MoveRecord(
             timestamp=time.time(),
@@ -94,7 +94,7 @@ class FileExecutor:
             return None
 
         record = self.undo_stack.pop()
-        src  = Path(record.destination)
+        src = Path(record.destination)
         dest = Path(record.source)
 
         if not src.exists():
@@ -144,7 +144,7 @@ class FileExecutor:
     def _ensure_log_file(self) -> None:
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.log_path.exists():
-            self.log_path.write_text("")   # create empty file
+            self.log_path.write_text("")  # create empty file
 
     def _write_log(self, record: MoveRecord) -> None:
         with self.log_path.open("a", encoding="utf-8") as f:

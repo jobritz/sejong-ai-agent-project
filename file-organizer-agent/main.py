@@ -42,10 +42,10 @@ LOG_FILENAME = "organizer.log"
 # ---------------------------------------------------------------------------
 def build_agent(watch_dir: Path):
     """Instantiate and wire up all agent components."""
-    log_path   = watch_dir / LOG_FILENAME
+    log_path = watch_dir / LOG_FILENAME
     classifier = FileClassifier()
-    executor   = FileExecutor(watch_dir, log_path)
-    handler    = OrganizerEventHandler(classifier, executor)
+    executor = FileExecutor(watch_dir, log_path)
+    handler = OrganizerEventHandler(classifier, executor)
     return classifier, executor, handler, log_path
 
 
@@ -80,7 +80,7 @@ def start_watching(watch_dir: Path) -> None:
         console.print(classifier.cost_estimate())
         sys.exit(0)
 
-    signal.signal(signal.SIGINT,  _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
     signal.signal(signal.SIGTERM, _shutdown)
 
     try:

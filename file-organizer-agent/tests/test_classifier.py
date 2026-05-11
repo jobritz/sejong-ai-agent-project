@@ -22,6 +22,7 @@ from config import EXTENSION_MAP, AMBIGUOUS_EXTENSIONS
 # Rule-based extension map
 # ---------------------------------------------------------------------------
 class TestExtensionMap:
+
     def test_image_extensions(self):
         for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
             assert EXTENSION_MAP.get(ext) == "images", f"Expected 'images' for {ext}"
@@ -55,6 +56,7 @@ class TestExtensionMap:
 # Temp file detection (stateless helper)
 # ---------------------------------------------------------------------------
 class TestTempFileDetection:
+
     @pytest.fixture
     def is_temp(self):
         from agent.watcher import OrganizerEventHandler
@@ -81,6 +83,7 @@ class TestTempFileDetection:
 # Collision resolution
 # ---------------------------------------------------------------------------
 class TestCollisionResolution:
+
     def test_no_collision(self, tmp_path):
         from agent.executor import FileExecutor
         target = tmp_path / "file.txt"

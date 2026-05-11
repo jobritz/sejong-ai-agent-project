@@ -22,24 +22,24 @@ file_organizer_agent/
     └── test_classifier.py  # unit tests (no API key needed)
 ```
 
-## Setup
+## Setup (for Windows)
 
 ```bash
 # 1. Clone / download the project
-cd file_organizer_agent
+git clone https://github.com/jobritz/sejong-ai-agent-project
 
-# 2. Create a virtual environment
+# 2. Create a virtual environment in the project directory
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+.venv\Scripts\activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Set your API key
-cp .env.example .env
-# Edit .env and add your OpenAI API key
+# 4. Install Ollama and get llama3 LLM
+irm https://ollama.com/install.ps1 | iex
+ollama pull llama3
 
-# 5. Run the tests (no API key needed)
+# 5. Run the tests
 python -m pytest tests/ -v
 ```
 
@@ -100,10 +100,3 @@ Edit `config.py` to:
 - **Self-correction** — low-confidence results fall back to "misc"
 - **Memory** — JSON log persists all decisions across sessions
 - **Reflection** — daily summary lets the agent "review" its work
-
-## Estimated API cost
-
-Using GPT-4o-mini (~$0.15 / 1M tokens):
-- Each LLM call uses ~100–150 tokens
-- 100 ambiguous files/day ≈ $0.002/day
-- Well within free-tier credits for a university project

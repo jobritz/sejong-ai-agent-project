@@ -7,17 +7,17 @@ Edit CATEGORIES to add your own rules before the LLM even gets called.
 # Folder names that will be created inside WATCH_DIR
 # ---------------------------------------------------------------------------
 CATEGORY_FOLDERS = {
-    "images":      "📷 Images",
-    "videos":      "🎬 Videos",
-    "audio":       "🎵 Audio",
-    "documents":   "📄 Documents",
+    "images": "📷 Images",
+    "videos": "🎬 Videos",
+    "audio": "🎵 Audio",
+    "documents": "📄 Documents",
     "spreadsheets":"📊 Spreadsheets",
-    "code":        "💻 Code",
-    "archives":    "📦 Archives",
-    "ebooks":      "📚 eBooks",
-    "design":      "🎨 Design",
-    "data":        "🗃️ Data",
-    "misc":        "🗂️ Misc",
+    "code": "💻 Code",
+    "archives": "📦 Archives",
+    "ebooks": "📚 eBooks",
+    "design": "🎨 Design",
+    "data": "🗃️ Data",
+    "misc": "🗂️ Misc",
 }
 
 # ---------------------------------------------------------------------------
@@ -26,27 +26,27 @@ CATEGORY_FOLDERS = {
 # ---------------------------------------------------------------------------
 EXTENSION_MAP = {
     # images
-    ".jpg": "images",  ".jpeg": "images", ".png": "images",
-    ".gif": "images",  ".webp": "images", ".svg": "images",
-    ".heic": "images", ".bmp": "images",  ".tiff": "images",
+    ".jpg": "images", ".jpeg": "images", ".png": "images",
+    ".gif": "images", ".webp": "images", ".svg": "images",
+    ".heic": "images", ".bmp": "images", ".tiff": "images",
     # videos
-    ".mp4": "videos",  ".mov": "videos",  ".avi": "videos",
-    ".mkv": "videos",  ".webm": "videos",
+    ".mp4": "videos", ".mov": "videos", ".avi": "videos",
+    ".mkv": "videos", ".webm": "videos",
     # audio
-    ".mp3": "audio",   ".wav": "audio",   ".flac": "audio",
-    ".aac": "audio",   ".ogg": "audio",   ".m4a": "audio",
+    ".mp3": "audio", ".wav": "audio", ".flac": "audio",
+    ".aac": "audio", ".ogg": "audio", ".m4a": "audio",
     # archives
-    ".zip": "archives",".tar": "archives",".gz": "archives",
-    ".rar": "archives",".7z": "archives",
+    ".zip": "archives", ".tar": "archives", ".gz": "archives",
+    ".rar": "archives", ".7z": "archives",
     # ebooks
     ".epub": "ebooks", ".mobi": "ebooks",
     # data
-    ".csv": "data",    ".json": "data",   ".xml": "data",
-    ".parquet": "data",".db": "data",     ".sqlite": "data",
+    ".csv": "data", ".json": "data", ".xml": "data",
+    ".parquet": "data", ".db": "data", ".sqlite": "data",
     # spreadsheets
     ".xlsx": "spreadsheets", ".xls": "spreadsheets", ".ods": "spreadsheets",
     # design
-    ".psd": "design",  ".ai": "design",   ".fig": "design",
+    ".psd": "design", ".ai": "design", ".fig": "design",
     ".sketch": "design", ".xd": "design",
 }
 
@@ -82,7 +82,7 @@ CLASSIFIER_USER_TEMPLATE = 'Classify this file: "{filename}"'
 # ---------------------------------------------------------------------------
 # Agent behaviour settings
 # ---------------------------------------------------------------------------
-CONFIDENCE_THRESHOLD = 0.70   # below this → move to misc, log a warning
-MIN_FILE_AGE_SECONDS  = 2     # ignore files still being written (partial downloads)
-MAX_UNDO_STACK        = 50    # max number of moves we can roll back
-SUMMARY_HOUR          = 18    # hour of day to print the daily summary (24h)
+CONFIDENCE_THRESHOLD = 0.70  # below this → move to misc, log a warning
+MIN_FILE_AGE_SECONDS = 2  # ignore files still being written (partial downloads)
+MAX_UNDO_STACK = 50  # max number of moves we can roll back
+SUMMARY_HOUR = 18  # hour of day to print the daily summary (24h)

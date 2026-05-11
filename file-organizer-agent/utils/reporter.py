@@ -18,7 +18,7 @@ from rich import box
 console = Console()
 
 
-def load_log(log_path: Path, since_hours: int = 24) -> list[dict]:
+def load_log(log_path: Path, since_hours: int=24) -> list[dict]:
     """Load log entries from the last *since_hours* hours."""
     if not log_path.exists():
         return []
@@ -41,7 +41,7 @@ def load_log(log_path: Path, since_hours: int = 24) -> list[dict]:
     return records
 
 
-def print_summary(log_path: Path, since_hours: int = 24) -> None:
+def print_summary(log_path: Path, since_hours: int=24) -> None:
     """Print a rich summary table for the last N hours."""
     records = load_log(log_path, since_hours)
 
@@ -52,10 +52,10 @@ def print_summary(log_path: Path, since_hours: int = 24) -> None:
         return
 
     # --- stats ---
-    total        = len(records)
-    llm_calls    = sum(1 for r in records if r.get("used_llm"))
-    categories   = Counter(r["category"] for r in records)
-    by_hour      = defaultdict(int)
+    total = len(records)
+    llm_calls = sum(1 for r in records if r.get("used_llm"))
+    categories = Counter(r["category"] for r in records)
+    by_hour = defaultdict(int)
 
     for r in records:
         dt = datetime.fromtimestamp(r["timestamp"])
@@ -71,8 +71,8 @@ def print_summary(log_path: Path, since_hours: int = 24) -> None:
     )
 
     table = Table(box=box.SIMPLE, show_header=True, header_style="bold")
-    table.add_column("Category",   style="green")
-    table.add_column("Count",      justify="right")
+    table.add_column("Category", style="green")
+    table.add_column("Count", justify="right")
     table.add_column("% of total", justify="right")
 
     for cat, count in categories.most_common():
@@ -83,7 +83,7 @@ def print_summary(log_path: Path, since_hours: int = 24) -> None:
     # --- recent moves ---
     console.print("\n[bold]Last 5 moves:[/bold]")
     for r in records[-5:]:
-        ts  = datetime.fromtimestamp(r["timestamp"]).strftime("%H:%M:%S")
+        ts = datetime.fromtimestamp(r["timestamp"]).strftime("%H:%M:%S")
         src = Path(r["destination"]).name
         console.print(
             f"  [dim]{ts}[/dim]  {src}  →  "
@@ -101,8 +101,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Print organizer daily summary")
-    parser.add_argument("--log",   default="organizer.log", help="Path to log file")
-    parser.add_argument("--hours", type=int, default=24,   help="Hours to look back")
+    parser.add_argument("--log", default="organizer.log", help="Path to log file")
+    parser.add_argument("--hours", type=int, default=24, help="Hours to look back")
     args = parser.parse_args()
 
     print_summary(Path(args.log), since_hours=args.hours)

@@ -33,9 +33,9 @@ class OrganizerEventHandler(FileSystemEventHandler):
     def __init__(self, classifier: FileClassifier, executor: FileExecutor):
         super().__init__()
         self.classifier = classifier
-        self.executor   = executor
+        self.executor = executor
         self.files_processed = 0
-        self.files_skipped   = 0
+        self.files_skipped = 0
 
     def on_created(self, event: FileCreatedEvent) -> None:
         if event.is_directory:
@@ -85,9 +85,9 @@ class OrganizerEventHandler(FileSystemEventHandler):
     def _is_temp_file(path: Path) -> bool:
         name = path.name
         return (
-            name.startswith(".")          # hidden files
-            or name.startswith("~$")      # Office temp files
-            or name.endswith(".part")     # Firefox partial downloads
-            or name.endswith(".crdownload")# Chrome partial downloads
+            name.startswith(".")  # hidden files
+            or name.startswith("~$")  # Office temp files
+            or name.endswith(".part")  # Firefox partial downloads
+            or name.endswith(".crdownload")  # Chrome partial downloads
             or name.endswith(".tmp")
         )
