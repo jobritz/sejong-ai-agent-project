@@ -99,7 +99,7 @@ All settings are in `config.py`:
 |---|---|---|
 | `WATCH_DIR` | `~/Downloads` | Folder to monitor |
 | `STUDIUM_DIR` | `~/Studium` | Root of your lecture folder tree |
-| `OLLAMA_MODEL` | `"llama3"` | Any model you have pulled locally |
+| `OLLAMA_MODEL` | `"gemma4:e2b"` | Any model you have pulled locally |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server address |
 | `MAX_CONTENT_CHARS` | `3000` | Text chars sent to the LLM per file |
 | `CONFIDENCE_THRESHOLD` | `0.60` | Below this → placed in `_Unsorted` |
