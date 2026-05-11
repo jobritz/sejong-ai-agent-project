@@ -34,6 +34,8 @@ class OrganizerEventHandler(FileSystemEventHandler):
         self.files_skipped = 0
 
     def on_created(self, event: FileCreatedEvent) -> None:
+        # print(f"[RAW EVENT] is_dir={event.is_directory} path={event.src_path}")
+        
         if event.is_directory:
             return
 
@@ -53,15 +55,31 @@ class OrganizerEventHandler(FileSystemEventHandler):
 
         self._process_file(filepath)
 
+    def on_moved(self, event):
+        if event.is_directory:
+            return
+
+        dest = Path(event.dest_path)
+
+        # Final file might still be a temp name (some apps do two renames)
+        if self._is_temp_file(dest):
+            return
+
+        time.sleep(MIN_FILE_AGE_SECONDS)
+
+        if not dest.exists():
+            return
+
+        self._process_file(dest)
+
     # ------------------------------------------------------------------
     def _process_file(self, filepath: Path) -> None:
         console.print(f"\n[bold]New file:[/bold] {filepath.name}")
 
         # Classify
         result = self.classifier.classify(filepath)
-        llm_tag = "[cyan](LLM)[/cyan]" if result.used_llm else "[dim](rule)[/dim]"
         console.print(
-            f"  {llm_tag} → [green]{result.semester}[/green] / "
+            f"Result → [green]{result.semester}[/green] / "
             f"[cyan]{result.lecture}[/cyan] "
             f"({result.confidence:.0%}) — {result.reason}"
         )

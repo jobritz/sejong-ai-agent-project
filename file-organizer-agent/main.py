@@ -30,7 +30,7 @@ from agent.executor import FileExecutor
 from agent.watcher import OrganizerEventHandler
 from config import SUMMARY_HOUR
 from utils.reporter import print_summary
-from config import WATCH_DIR, STUDIUM_DIR
+from config import WATCH_DIR, LOG_DIR
 
 load_dotenv()
 console = Console()
@@ -43,7 +43,7 @@ LOG_FILENAME = "organizer.log"
 # ---------------------------------------------------------------------------
 def build_agent(watch_dir: Path):
     """Instantiate and wire up all agent components."""
-    log_path = STUDIUM_DIR / LOG_FILENAME
+    log_path = LOG_DIR / LOG_FILENAME
     classifier = FileClassifier()
     executor = FileExecutor(watch_dir, log_path)
     handler = OrganizerEventHandler(classifier, executor)

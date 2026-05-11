@@ -5,12 +5,13 @@ from pathlib import Path
 # Paths
 # ---------------------------------------------------------------------------
 WATCH_DIR   = Path.home() / "Downloads"
-STUDIUM_DIR = Path.home() / "Desktop\Studium"  # root of your folder tree
+STUDIUM_DIR = Path.home() / "Desktop/Studium"  # root of your folder tree
+LOG_DIR = Path(__file__).parent.resolve() / "log"
 
 # ---------------------------------------------------------------------------
-# Ollama (local LLM — no API key needed)
+# Ollama (local LLM)
 # ---------------------------------------------------------------------------
-OLLAMA_MODEL = "llama3"          # must be pulled: `ollama pull llama3`
+OLLAMA_MODEL = "gemma4:e2b"
 OLLAMA_URL   = "http://localhost:11434"
 
 # ---------------------------------------------------------------------------
