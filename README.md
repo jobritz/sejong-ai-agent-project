@@ -106,7 +106,7 @@ All settings are in `config.py`:
 | `OLLAMA_MODEL` | `"gemma4:e2b"` | Any model you have pulled locally |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server address |
 | `MAX_CONTENT_CHARS` | `3000` | Text chars sent to the LLM per file |
-| `CONFIDENCE_THRESHOLD` | `0.60` | Below this → placed in `_Unsorted` |
+| `CONFIDENCE_THRESHOLD` | `0.81` | Below this → placed in `_Unsorted` |
 | `MIN_FILE_AGE_SECONDS` | `2` | Wait time after file appears |
 | `SUMMARY_HOUR` | `18` | Hour for the automatic daily summary |
 
@@ -147,7 +147,7 @@ Run `ollama serve` in a separate terminal before starting the agent.
 **File lands in `_Unsorted`**
 The LLM confidence was below the threshold. Check that the semester and
 lecture folder names in `UNIVERSITY_DIR` are descriptive enough for the LLM to
-match against. Rename vague folders like `"Mathe"` to `"Mathematik 1"`.
+match against. Rename vague folders like `"Analysis"` to `"Analysis 1"`.
 
 **Wrong lecture chosen**
 Increase `MAX_CONTENT_CHARS` in `config.py` to give the LLM more context,
