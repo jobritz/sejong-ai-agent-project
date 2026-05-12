@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import ollama
 import fitz
-import doc
+import docx
 from pptx import Presentation
 import base64
 from io import BytesIO
