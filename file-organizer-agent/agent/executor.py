@@ -33,7 +33,7 @@ class MoveRecord:
     timestamp: float
     filename: str
     source: str  # absolute path before move
-    destination:str  # absolute path after move
+    destination: str  # absolute path after move
     category: str
     confidence: float
     reason: str

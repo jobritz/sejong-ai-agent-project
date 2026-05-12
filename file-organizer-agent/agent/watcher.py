@@ -20,6 +20,7 @@ from agent.executor import FileExecutor
 
 console = Console()
 
+
 class OrganizerEventHandler(FileSystemEventHandler):
     """
     Reacts to file creation events in the watched directory.

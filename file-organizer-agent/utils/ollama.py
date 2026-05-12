@@ -16,7 +16,8 @@ console = Console()
 
 _server_process: subprocess.Popen | None = None
 
-def ensure_ollama_ready(model: str = OLLAMA_MODEL, timeout: int = 30) -> None:
+
+def ensure_ollama_ready(model: str=OLLAMA_MODEL, timeout: int=30) -> None:
     """
     Ensure the Ollama server is running and the required model is available.
 
@@ -71,7 +72,7 @@ def _ensure_model_available(model: str) -> None:
     # client.list() returns a ListResponse object in newer ollama versions.
     # Each entry is a Model object with a .model attribute, not a dict.
     response = client.list()
-    models   = getattr(response, "models", None) or response.get("models", [])
+    models = getattr(response, "models", None) or response.get("models", [])
 
     available = []
     for m in models:
@@ -92,16 +93,17 @@ def _ensure_model_available(model: str) -> None:
     )
     for progress in client.pull(model, stream=True):
         status = progress.get("status", "")
-        total  = progress.get("total", 0)
-        done   = progress.get("completed", 0)
+        total = progress.get("total", 0)
+        done = progress.get("completed", 0)
         if total:
             console.print(f"  [dim]{status}: {done / total * 100:.1f}%[/dim]", end="\r")
         else:
             console.print(f"  [dim]{status}[/dim]", end="\r")
 
     console.print(f"\n  [green]✓ Model '{model}' ready.[/green]")
+
     
-def shutdown_ollama(model: str = OLLAMA_MODEL) -> None:
+def shutdown_ollama(model: str=OLLAMA_MODEL) -> None:
     # 1. Unload the model via the REST API directly (bypasses client quirks)
     try:
         httpx.post(

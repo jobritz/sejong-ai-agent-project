@@ -99,7 +99,7 @@ def main() -> None:
     parser.add_argument(
         "--watch", "-w",
         type=Path,
-        default=Path(os.getenv("WATCH_DIR", str(WATCH_DIR))), 
+        default=Path(os.getenv("WATCH_DIR", str(WATCH_DIR))),
         help="Folder to watch (default: ~/Downloads or $WATCH_DIR)",
     )
     parser.add_argument(

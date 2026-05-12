@@ -12,21 +12,15 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-
 import ollama
-import fitz                     # pymupdf
-import docx                     # python-docx
-from pptx import Presentation   # python-pptx
+import fitz
+import doc
+from pptx import Presentation
 import base64
 from io import BytesIO
 from PIL import Image 
 from rich.console import Console
-
-from config import (
-    OLLAMA_MODEL, OLLAMA_URL,
-    MAX_CONTENT_CHARS, READABLE_EXTENSIONS, IMAGE_EXTENSIONS, CONFIDENCE_THRESHOLD,
-    TARGET_DIR
-)
+from config import (OLLAMA_MODEL, OLLAMA_URL, MAX_CONTENT_CHARS, READABLE_EXTENSIONS, IMAGE_EXTENSIONS, CONFIDENCE_THRESHOLD, TARGET_DIR)
 
 console = Console()
 
@@ -37,9 +31,9 @@ console = Console()
 @dataclass
 class ClassifyResult:
     target_path: str 
-    confidence:  float
-    reason:      str
-    error:       str = ""
+    confidence: float
+    reason: str
+    error: str = ""
     should_move: bool = True
 
     @property
@@ -69,6 +63,7 @@ def scan_folder_tree() -> list[str]:
         for d in TARGET_DIR.rglob("*")
         if d.is_dir() and not d.name.startswith(".")
     )
+
 
 # ---------------------------------------------------------------------------
 # Content extractor
@@ -111,29 +106,27 @@ def extract_text(filepath: Path) -> str:
 
     return text[:MAX_CONTENT_CHARS].strip()
 
-def load_image_base64(filepath: Path, max_px: int = 1024) -> str:
-    """
-    Load an image, downscale it so the longest edge ≤ max_px, and return
-    a base64-encoded JPEG string ready for the Ollama vision API.
-    Keeping images small is important — large images slow inference
-    significantly and provide little extra information for classification.
-    """
+
+def load_image_base64(filepath: Path, max_px: int=1024) -> str:
+    """Load an image, downscale it so the longest edge ≤ max_px, and return a base64-encoded JPEG string ready for the Ollama vision API."""
     with Image.open(filepath) as img:
-        img = img.convert("RGB")          # drop alpha, normalise mode
-        img.thumbnail((max_px, max_px))   # resize in-place, keeps aspect ratio
+        img = img.convert("RGB")
+        img.thumbnail((max_px, max_px))
         buf = BytesIO()
         img.save(buf, format="JPEG", quality=85)
         return base64.b64encode(buf.getvalue()).decode("utf-8")
+
 
 # ---------------------------------------------------------------------------
 # Classifier
 # ---------------------------------------------------------------------------
 class FileClassifier:
+
     def __init__(self):
-        # Validate Ollama is reachable at startup
+        """Validate Ollama is reachable at startup"""
         try:
             client = ollama.Client(host=OLLAMA_URL)
-            client.list()   # raises if Ollama isn't running
+            client.list()
             self.client = client
             self.model = OLLAMA_MODEL
         except Exception:
@@ -146,8 +139,8 @@ class FileClassifier:
 
     # ------------------------------------------------------------------
     def classify(self, filepath: Path) -> ClassifyResult:
-        ext       = filepath.suffix.lower()
-        content   = ""
+        ext = filepath.suffix.lower()
+        content = ""
         image_b64 = None
 
         if ext in IMAGE_EXTENSIONS:
@@ -161,7 +154,7 @@ class FileClassifier:
         return self._llm_classify(filepath.name, content, image_b64)
 
     # ------------------------------------------------------------------
-    def _llm_classify(self, filename: str, content: str = "", image_b64: str | None = None,) -> ClassifyResult:
+    def _llm_classify(self, filename: str, content: str="", image_b64: str | None=None,) -> ClassifyResult:
         folders_str = "\n".join(f"  - {f}" for f in self.folders)
 
         content_section = (
@@ -191,7 +184,7 @@ Respond ONLY with a JSON object — no markdown, no explanation outside it:
 }}
 """
         message = (
-            {"role": "user", "content": prompt, "images":  [image_b64]}
+            {"role": "user", "content": prompt, "images": [image_b64]}
             if image_b64 else
             {"role": "user", "content": prompt}
         )
