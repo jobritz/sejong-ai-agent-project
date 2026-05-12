@@ -14,13 +14,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import ollama
-import fitz          # pymupdf
-import docx          # python-docx
+import fitz                     # pymupdf
+import docx                     # python-docx
+from pptx import Presentation   # python-pptx
+import base64
+from io import BytesIO
+from PIL import Image 
 from rich.console import Console
 
 from config import (
     UNIVERSITY_DIR, OLLAMA_MODEL, OLLAMA_URL,
-    MAX_CONTENT_CHARS, READABLE_EXTENSIONS, CONFIDENCE_THRESHOLD,
+    MAX_CONTENT_CHARS, READABLE_EXTENSIONS, IMAGE_EXTENSIONS, CONFIDENCE_THRESHOLD,
     LECTURE_SUBFOLDERS,
 )
 
@@ -92,6 +96,18 @@ def extract_text(filepath: Path) -> str:
         elif ext in {".docx", ".doc"}:
             document = docx.Document(str(filepath))
             text = "\n".join(p.text for p in document.paragraphs)
+            
+        elif ext == {".pptx", ".ppt"}:
+            prs = Presentation(str(filepath))
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if shape.has_text_frame:
+                        for para in shape.text_frame.paragraphs:
+                            text += para.text + "\n"
+                    if len(text) >= MAX_CONTENT_CHARS:
+                        break
+                if len(text) >= MAX_CONTENT_CHARS:
+                    break
 
         elif ext in READABLE_EXTENSIONS:
             text = filepath.read_text(encoding="utf-8", errors="ignore")
@@ -101,6 +117,19 @@ def extract_text(filepath: Path) -> str:
 
     return text[:MAX_CONTENT_CHARS].strip()
 
+def load_image_base64(filepath: Path, max_px: int = 1024) -> str:
+    """
+    Load an image, downscale it so the longest edge ≤ max_px, and return
+    a base64-encoded JPEG string ready for the Ollama vision API.
+    Keeping images small is important — large images slow inference
+    significantly and provide little extra information for classification.
+    """
+    with Image.open(filepath) as img:
+        img = img.convert("RGB")          # drop alpha, normalise mode
+        img.thumbnail((max_px, max_px))   # resize in-place, keeps aspect ratio
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 # ---------------------------------------------------------------------------
 # Classifier
@@ -123,15 +152,36 @@ class FileClassifier:
 
     # ------------------------------------------------------------------
     def classify(self, filepath: Path) -> ClassifyResult:
-        content = extract_text(filepath)
-        return self._llm_classify(filepath.name, content)
+        ext       = filepath.suffix.lower()
+        content   = ""
+        image_b64 = None
+
+        if ext in IMAGE_EXTENSIONS:
+            try:
+                image_b64 = load_image_base64(filepath)
+            except Exception as e:
+                return self._fallback(f"Could not load image: {e}")
+        else:
+            content = extract_text(filepath)
+
+        return self._llm_classify(filepath.name, content, image_b64)
 
     # ------------------------------------------------------------------
-    def _llm_classify(self, filename: str, content: str) -> ClassifyResult:
+    def _llm_classify(
+        self,
+        filename:  str,
+        content:   str       = "",
+        image_b64: str | None = None,
+    ) -> ClassifyResult:
         tree_str = json.dumps(self.tree, ensure_ascii=False, indent=2)
-        content_snippet = content if content else "(no readable content — use filename only)"
 
-        prompt = f"""You are a file organiser.
+        content_section = (
+            "(see attached image)"          if image_b64 else
+            content                         if content   else
+            "(no readable content — use filename only)"
+        )
+        
+        prompt = f"""You are a file organiser for a student.
 Given a filename and a content snippet, choose the best semester folder,
 lecture subfolder, and file-type subfolder from the structures below.
 
@@ -142,16 +192,14 @@ Available subfolders under every lecture:
 {LECTURE_SUBFOLDERS}
 
 Filename: {filename}
-Content snippet:
+Content:
 ---
-{content_snippet}
+{content_section}
 ---
 
 Subfolder rules:
-- Use "Assignments" for exercises, homework, problem sets, solutions,
-  lab sheets, or any file the student is meant to complete or submit.
-- Use "Lecture Notes" for slides, scripts, summaries, transcripts,
-  reading material, or any file provided by the lecturer.
+- Use "Assignments" for exercises, homework, problem sets, solutions, or lab sheets.
+- Use "Lecture Notes" for slides, scripts, summaries, or lecturer-provided material.
 - When in doubt, use "Lecture Notes".
 
 Respond ONLY with a JSON object — no markdown, no explanation outside it:
@@ -163,11 +211,20 @@ Respond ONLY with a JSON object — no markdown, no explanation outside it:
   "reason": "<one sentence, max 15 words>"
 }}
 """
+        message = (
+            {
+                "role":    "user",
+                "content": prompt,
+                "images":  [image_b64],   # ← separate key, content stays a plain string
+            }
+            if image_b64 else
+            {"role": "user", "content": prompt}
+        )
 
         try:
             response = self.client.chat(
                 model=OLLAMA_MODEL,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[message],
                 format="json",
                 options={"temperature": 0},
             )

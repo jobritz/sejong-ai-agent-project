@@ -12,7 +12,7 @@ LECTURE_SUBFOLDERS = ["Assignments", "Lecture Notes"]
 # ---------------------------------------------------------------------------
 # Ollama (local LLM)
 # ---------------------------------------------------------------------------
-OLLAMA_MODEL = "gemma4:e2b"
+OLLAMA_MODEL = "gemma4:e4b"
 OLLAMA_URL   = "http://localhost:11434"
 
 # ---------------------------------------------------------------------------
@@ -24,7 +24,11 @@ MAX_CONTENT_CHARS = 3000   # how many chars to send to the LLM (keeps it fast)
 READABLE_EXTENSIONS = {
     ".pdf", ".txt", ".md", ".py", ".js", ".ts", ".java",
     ".cpp", ".c", ".h", ".html", ".css", ".csv",
-    ".docx", ".doc", ".pptx",
+    ".docx", ".doc", ".pptx", ".ppt",
+}
+
+IMAGE_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".heic",
 }
 
 # ---------------------------------------------------------------------------
