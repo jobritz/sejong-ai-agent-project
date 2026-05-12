@@ -1,7 +1,7 @@
-# Studium File Organizer Agent
+# Student File Organizer Agent
 
-An agentic AI system that watches `~/Downloads` and automatically sorts
-new files into your `~/Studium` semester/lecture folder tree — using a
+An agentic AI system that watches `WATCH_DIR` and automatically sorts
+new files into your `UNIVERSITY_DIR` semester/lecture folder tree — using a
 **fully local LLM** (Llama 3 via Ollama). No API key, no cloud, no cost.
 
 ## Project structure
@@ -16,13 +16,15 @@ file_organizer_agent/
 │   ├── executor.py       # file mover + undo stack + log writer
 │   └── watcher.py        # watchdog event handler
 └── utils/
-    └── reporter.py       # daily summary report
+    ├── reporter.py       # daily summary report
+    └── ollama.py			# manages the ollama server and LLM
 ```
 
 ## Prerequisites
 
 - Python 3.10+
-- [Ollama](https://ollama.com) installed and running
+- [Ollama](https://ollama.com) installed
+- at least 8GB RAM for llama3 / 16GB RAM for gemma4:e2b
 
 ## Setup (for Windows)
 
@@ -40,14 +42,14 @@ pip install -r requirements.txt
 # 4. Install Ollama and get LLM (e.g. gemma4:e2b)
 ollama pull gemma4:e2b
 
-# 5. Create your Studium folder structure
-mkdir -p ~/Studium/1.\ Semester/Database\ 1
-mkdir -p ~/Studium/1.\ Semester/Operating Systems
+# 5. Create your University folder structure
+mkdir -p [UNIVERSITY_DIR]/Semester 4/Database
+mkdir -p [UNIVERSITY_DIR]/Semester 4/Database/Lecture Notes
+mkdir -p [UNIVERSITY_DIR]/Semester 4/Database/Assignments
+mkdir -p [UNIVERSITY_DIR]/Semester 4/Operating Systems
 # … add as many semesters and lectures as you need
 
 ```
-
-No `.env` file or API key is required.
 
 ## Usage
 
@@ -80,16 +82,17 @@ python main.py --summary --hours 48
    - `.txt`, `.md`, `.py`, `.html`, … — direct read
    - Unreadable files (images, binaries) — filename only
 5. **Ollama classifier** receives the text snippet + your real folder tree
-   (scanned live from `~/Studium`) and returns:
-   - `semester` — exact folder name, e.g. `"2. Semester"`
-   - `lecture`  — exact subfolder name, e.g. `"Analysis 2"`
+   (scanned live from `UNIVERSITY_DIR`) and returns:
+   - `semester` — exact folder name, e.g. `"Semester 4"`
+   - `lecture`  — exact lecture name, e.g. `"Operating Systems"`
+   - `subfolder`  — exact subfolder name, e.g. `"Assignments"`
    - `confidence` — float 0–1
    - `reason` — one-sentence explanation
-6. **Executor** moves the file to `~/Studium/<semester>/<lecture>/`,
+6. **Executor** moves the file to `UNIVERSITY_DIR/<semester>/<lecture>/<subfolder>`,
    creates the path if needed, and handles filename collisions.
-7. Every move is appended to a JSON-lines log at `~/Studium/organizer.log`.
+7. Every move is appended to a JSON-lines log at `LOG_DIR/organizer.log`.
 8. **Undo stack** lets you roll back moves within a session.
-9. **Daily summary** is printed at 18:00 and on shutdown.
+9. **Daily summary** is printed on shutdown.
 
 ## Configuration
 
@@ -98,7 +101,8 @@ All settings are in `config.py`:
 | Setting | Default | Description |
 |---|---|---|
 | `WATCH_DIR` | `~/Downloads` | Folder to monitor |
-| `STUDIUM_DIR` | `~/Studium` | Root of your lecture folder tree |
+| `UNIVERSITY_DIR` | `~/Desktop/University` | Root of your lecture folder tree |
+| `LOG_DIR` | `./log` | Root of your log files
 | `OLLAMA_MODEL` | `"gemma4:e2b"` | Any model you have pulled locally |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server address |
 | `MAX_CONTENT_CHARS` | `3000` | Text chars sent to the LLM per file |
@@ -107,7 +111,7 @@ All settings are in `config.py`:
 | `SUMMARY_HOUR` | `18` | Hour for the automatic daily summary |
 
 To add a new lecture, just create the folder — no code change needed.
-The agent scans `~/Studium` at startup and picks up new folders
+The agent scans `UNIVERSITY_DIR` at startup and picks up new folders
 automatically on the next run (or call `classifier.reload_tree()`).
 
 ## 4-week implementation plan
@@ -142,7 +146,7 @@ Run `ollama serve` in a separate terminal before starting the agent.
 
 **File lands in `_Unsorted`**
 The LLM confidence was below the threshold. Check that the semester and
-lecture folder names in `~/Studium` are descriptive enough for the LLM to
+lecture folder names in `UNIVERSITY_DIR` are descriptive enough for the LLM to
 match against. Rename vague folders like `"Mathe"` to `"Mathematik 1"`.
 
 **Wrong lecture chosen**

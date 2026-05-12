@@ -5,8 +5,9 @@ from pathlib import Path
 # Paths
 # ---------------------------------------------------------------------------
 WATCH_DIR   = Path.home() / "Downloads"
-STUDIUM_DIR = Path.home() / "Desktop/Studium"  # root of your folder tree
+UNIVERSITY_DIR = Path.home() / "Desktop/University"  # root of your folder tree
 LOG_DIR = Path(__file__).parent.resolve() / "log"
+LECTURE_SUBFOLDERS = ["Assignments", "Lecture Notes"]
 
 # ---------------------------------------------------------------------------
 # Ollama (local LLM)

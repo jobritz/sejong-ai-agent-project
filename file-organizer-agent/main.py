@@ -6,10 +6,6 @@ Usage:
   python main.py --watch ~/Downloads --undo   # undo last move
   python main.py --watch ~/Downloads --undo-all  # undo everything
   python main.py --summary                    # print today's summary
-
-Environment:
-  OPENAI_API_KEY  — required (put in .env file)
-  WATCH_DIR       — optional override (or use --watch flag)
 """
 
 from __future__ import annotations
@@ -30,6 +26,7 @@ from agent.executor import FileExecutor
 from agent.watcher import OrganizerEventHandler
 from config import SUMMARY_HOUR
 from utils.reporter import print_summary
+from utils.ollama import ensure_ollama_ready, shutdown_ollama 
 from config import WATCH_DIR, LOG_DIR
 
 load_dotenv()
@@ -57,6 +54,7 @@ def start_watching(watch_dir: Path) -> None:
         console.print(f"[red]Error:[/red] '{watch_dir}' does not exist.")
         sys.exit(1)
 
+    ensure_ollama_ready()
     classifier, executor, handler, log_path = build_agent(watch_dir)
 
     console.print(f"\n[bold green]Smart File Organizer Agent[/bold green]")
@@ -65,11 +63,6 @@ def start_watching(watch_dir: Path) -> None:
     console.print(f"  Log:      [cyan]{log_path}[/cyan]")
     console.print("  Press [bold]Ctrl+C[/bold] to stop.\n")
 
-    # Schedule daily summary at configured hour
-    schedule.every().day.at(f"{SUMMARY_HOUR:02d}:00").do(
-        print_summary, log_path, 24
-    )
-
     observer = Observer()
     observer.schedule(handler, str(watch_dir), recursive=False)
     observer.start()
@@ -77,6 +70,7 @@ def start_watching(watch_dir: Path) -> None:
     def _shutdown(sig, frame):
         console.print("\n[yellow]Shutting down...[/yellow]")
         observer.stop()
+        shutdown_ollama()
         print_summary(log_path, since_hours=24)
         sys.exit(0)
 
