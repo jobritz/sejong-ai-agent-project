@@ -57,9 +57,6 @@ class FileExecutor:
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------
-    # Replace the execute() method only — everything else stays the same
-
-
     def execute(self, filepath: Path, result: ClassifyResult) -> MoveRecord | None:
         if not filepath.exists():
             console.print(f"  [dim]File gone before move: {filepath.name}[/dim]")
@@ -75,8 +72,7 @@ class FileExecutor:
             filename=filepath.name,
             source=str(filepath),
             destination=str(dest_path),
-            # ← store semester + lecture instead of flat category
-            category=f"{result.semester} / {result.lecture}",
+            category=result.target_path,
             confidence=result.confidence,
             reason=result.reason,
             used_llm=True,

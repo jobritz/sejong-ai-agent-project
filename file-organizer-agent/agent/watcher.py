@@ -79,10 +79,19 @@ class OrganizerEventHandler(FileSystemEventHandler):
         # Classify
         result = self.classifier.classify(filepath)
         console.print(
-            f"Result → [green]{result.semester}[/green] / "
-            f"[cyan]{result.lecture}[/cyan] "
+            # f"Result → [green]{result.semester}[/green] / "
+            # f"[cyan]{result.lecture}[/cyan] "
+            f"Result → [green]{result.target_path}[/green] "
             f"({result.confidence:.0%}) — {result.reason}"
         )
+        # Check if file should be moved
+        if not result.should_move:
+            console.print(
+                f"  [yellow]⚠ Classification failed — "
+                f"'{filepath.name}' left in place.[/yellow]"
+            )
+            self.files_skipped += 1
+            return
 
         # Execute move
         record = self.executor.execute(filepath, result)

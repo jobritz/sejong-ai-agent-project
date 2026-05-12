@@ -23,9 +23,9 @@ from PIL import Image
 from rich.console import Console
 
 from config import (
-    UNIVERSITY_DIR, OLLAMA_MODEL, OLLAMA_URL,
+    OLLAMA_MODEL, OLLAMA_URL,
     MAX_CONTENT_CHARS, READABLE_EXTENSIONS, IMAGE_EXTENSIONS, CONFIDENCE_THRESHOLD,
-    LECTURE_SUBFOLDERS,
+    TARGET_DIR
 )
 
 console = Console()
@@ -36,16 +36,15 @@ console = Console()
 # ---------------------------------------------------------------------------
 @dataclass
 class ClassifyResult:
-    semester:   str        # e.g. "Semester 4"
-    lecture:    str        # e.g. "Operating Systems"
-    subfolder:  str        # e.g. "Assignments"
-    confidence: float
-    reason:     str
-    error:      str = ""
+    target_path: str 
+    confidence:  float
+    reason:      str
+    error:       str = ""
+    should_move: bool = True
 
     @property
     def target_dir(self) -> Path:
-        return UNIVERSITY_DIR / self.semester / self.lecture / self.subfolder
+        return TARGET_DIR / self.target_path
 
     @property
     def is_confident(self) -> bool:
@@ -55,26 +54,21 @@ class ClassifyResult:
 # ---------------------------------------------------------------------------
 # Folder scanner
 # ---------------------------------------------------------------------------
-def scan_university_tree() -> dict[str, list[str]]:
+def scan_folder_tree() -> list[str]:
     """
-    Returns {semester_name: [lecture_name, …]} by reading the real folder tree.
-    Example: {"1. Semester": ["Mathematik 1", "Informatik"], …}
+    Returns a flat list of all subdirectory paths relative to TARGET_DIR.
+    Works with any folder structure at any depth.
     """
-    tree: dict[str, list[str]] = {}
-    if not UNIVERSITY_DIR.exists():
+    if not TARGET_DIR.exists():
         raise FileNotFoundError(
-            f"University folder not found: {UNIVERSITY_DIR}\n"
-            "Create it first or update UNIVERSITY_DIR in config.py"
+            f"Target folder not found: {TARGET_DIR}\n"
+            "Create it first or update TARGET_DIR in config.py"
         )
-    for sem_dir in sorted(UNIVERSITY_DIR.iterdir()):
-        if sem_dir.is_dir() and not sem_dir.name.startswith("."):
-            lectures = [
-                d.name for d in sorted(sem_dir.iterdir())
-                if d.is_dir() and not d.name.startswith(".")
-            ]
-            tree[sem_dir.name] = lectures
-    return tree
-
+    return sorted(
+        d.relative_to(TARGET_DIR).as_posix()
+        for d in TARGET_DIR.rglob("*")
+        if d.is_dir() and not d.name.startswith(".")
+    )
 
 # ---------------------------------------------------------------------------
 # Content extractor
@@ -146,9 +140,9 @@ class FileClassifier:
             raise RuntimeError(
                 "Cannot reach Ollama at " + OLLAMA_URL + "\n"
             )
-        self.tree = scan_university_tree()
-        console.print(f"  Loaded {sum(len(v) for v in self.tree.values())} lectures "
-                      f"across {len(self.tree)} semesters from University folder.")
+
+        self.folders = scan_folder_tree()
+        console.print(f"  Loaded {len(self.folders)} folders from {TARGET_DIR}.")
 
     # ------------------------------------------------------------------
     def classify(self, filepath: Path) -> ClassifyResult:
@@ -167,13 +161,8 @@ class FileClassifier:
         return self._llm_classify(filepath.name, content, image_b64)
 
     # ------------------------------------------------------------------
-    def _llm_classify(
-        self,
-        filename:  str,
-        content:   str       = "",
-        image_b64: str | None = None,
-    ) -> ClassifyResult:
-        tree_str = json.dumps(self.tree, ensure_ascii=False, indent=2)
+    def _llm_classify(self, filename: str, content: str = "", image_b64: str | None = None,) -> ClassifyResult:
+        folders_str = "\n".join(f"  - {f}" for f in self.folders)
 
         content_section = (
             "(see attached image)"          if image_b64 else
@@ -185,11 +174,8 @@ class FileClassifier:
 Given a filename and a content snippet, choose the best semester folder,
 lecture subfolder, and file-type subfolder from the structures below.
 
-Available semester/lecture structure (JSON):
-{tree_str}
-
-Available subfolders under every lecture:
-{LECTURE_SUBFOLDERS}
+Available folders (relative paths):
+{folders_str}
 
 Filename: {filename}
 Content:
@@ -197,30 +183,19 @@ Content:
 {content_section}
 ---
 
-Subfolder rules:
-- Use "Assignments" for exercises, homework, problem sets, solutions, or lab sheets.
-- Use "Lecture Notes" for slides, scripts, summaries, or lecturer-provided material.
-- When in doubt, use "Lecture Notes".
-
 Respond ONLY with a JSON object — no markdown, no explanation outside it:
 {{
-  "semester":  "<exact semester folder name>",
-  "lecture":   "<exact lecture folder name>",
-  "subfolder": "<Assignments or Lecture Notes>",
+  "target_path": "<exact relative folder path from the list of Available folders above>",
   "confidence": <float 0.0-1.0>,
   "reason": "<one sentence, max 15 words>"
 }}
 """
         message = (
-            {
-                "role":    "user",
-                "content": prompt,
-                "images":  [image_b64],   # ← separate key, content stays a plain string
-            }
+            {"role": "user", "content": prompt, "images":  [image_b64]}
             if image_b64 else
             {"role": "user", "content": prompt}
         )
-
+        
         try:
             response = self.client.chat(
                 model=OLLAMA_MODEL,
@@ -228,29 +203,19 @@ Respond ONLY with a JSON object — no markdown, no explanation outside it:
                 format="json",
                 options={"temperature": 0},
             )
-            raw = response["message"]["content"]
-            data = json.loads(raw)
+            data = json.loads(response["message"]["content"])
 
-            semester = data.get("semester", "")
-            lecture  = data.get("lecture",  "")
-            subfolder = data.get("subfolder", "")
-
-            # Validate against real folder tree
-            if subfolder not in LECTURE_SUBFOLDERS:
-                subfolder = "Lecture Notes"
-            if semester not in self.tree:
-                return self._fallback(f"Unknown semester '{semester}' returned by LLM")
-            if lecture not in self.tree[semester]:
-                return self._fallback(
-                    f"Lecture '{lecture}' not in {semester}", semester=semester
-                )
+            target_path = data.get("target_path", "")
+            target_path = target_path.replace("\\", "/").replace("//", "/").strip("/")
+            
+            if target_path not in self.folders:
+                return self._fallback(f"Unknown path '{target_path}' not in folder list")
 
             result = ClassifyResult(
-                semester=semester,
-                lecture=lecture,
-                subfolder=subfolder,
+                target_path=target_path,
                 confidence=float(data.get("confidence", 0.5)),
                 reason=data.get("reason", "LLM classification."),
+                should_move=True,
             )
 
             if not result.is_confident:
@@ -266,20 +231,16 @@ Respond ONLY with a JSON object — no markdown, no explanation outside it:
         except Exception as e:
             return self._fallback(f"LLM call failed: {e}")
 
-    def _fallback(self, reason: str, semester: str = "") -> ClassifyResult:
-        """When classification fails, pick the first semester as a safe landing zone."""
-        first_sem = semester or (list(self.tree.keys())[0] if self.tree else "")
+    def _fallback(self, reason: str) -> ClassifyResult:
         console.print(f"  [red]Fallback:[/red] {reason}")
         return ClassifyResult(
-            semester=first_sem,
-            lecture="_Unsorted",
-            subfolder="Lecture Notes",
+            target_path="",
             confidence=0.0,
             reason=reason,
             error=reason,
+            should_move=False,
         )
 
     def reload_tree(self) -> None:
-        """Call this if you add new semester/lecture folders at runtime."""
-        self.tree = scan_university_tree()
+        self.folders = scan_folder_tree()
         console.print("  [dim]Folder tree reloaded.[/dim]")
