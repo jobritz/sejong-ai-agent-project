@@ -4,6 +4,10 @@ An agentic AI system that watches `WATCH_DIR` and automatically sorts
 new files into your `TARGET_DIR` folder tree — using a
 **fully local LLM** (gemma4 via Ollama). No API key, no cloud, no cost.
 
+## Visual Overview
+
+![Overview](agent-overview.png)
+
 ## Project structure
 
 ```
