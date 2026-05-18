@@ -21,7 +21,7 @@ file_organizer_agent/
 │   └── watcher.py        # watchdog event handler
 └── utils/
     ├── reporter.py       # daily summary report
-    └── ollama.py	  # manages the ollama server and LLM
+    └── ollama.py         # manages the ollama server and LLM
 ```
 
 ## Prerequisites
